@@ -1,0 +1,6 @@
+{
+  "name": "SiliconLens",
+  "description": "Identify microchips, integrated circuits, sensors, and breadboard setups from photos with instant pinouts, wiring warnings, and starter code.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
