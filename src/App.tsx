@@ -56,9 +56,10 @@ export default function App() {
     try {
       let payload: Partial<ComponentAnalysis> & { error?: string };
       let serverResponse: Response | null = null;
+      const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
 
       try {
-        serverResponse = await fetch('/api/analyze-component', {
+        serverResponse = await fetch(`${apiBaseUrl}/api/analyze-component`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           signal: controller.signal,
@@ -134,13 +135,15 @@ export default function App() {
       setErrorState({
         title: 'Analysis Error',
         message:
-          message.includes('API_KEY_INVALID') ||
-          message.includes('API key not valid') ||
-          message.includes('PERMISSION_DENIED')
-            ? 'The configured Gemini API key was rejected. Please verify your API key.'
-            : message.includes('RESOURCE_EXHAUSTED') || message.includes('429')
-              ? 'Analysis quota temporarily reached. Please wait a moment and try again.'
-              : 'Unable to analyze this image right now. Please check your connection and try again.',
+          message === 'VITE_GEMINI_API_KEY_MISSING'
+            ? 'No backend API server or VITE_GEMINI_API_KEY environment variable is configured. Set GEMINI_API_KEY on your server or VITE_GEMINI_API_KEY in your static host settings.'
+            : message.includes('API_KEY_INVALID') ||
+                message.includes('API key not valid') ||
+                message.includes('PERMISSION_DENIED')
+              ? 'The configured Gemini API key was rejected. Please verify your API key.'
+              : message.includes('RESOURCE_EXHAUSTED') || message.includes('429')
+                ? 'Analysis quota temporarily reached. Please wait a moment and try again.'
+                : 'Unable to analyze this image right now. Please check your connection and try again.',
       });
     } finally {
       if (abortControllerRef.current === controller) {

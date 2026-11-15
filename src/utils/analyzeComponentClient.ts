@@ -120,7 +120,13 @@ const analysisSchema = {
   ],
 };
 
-const GEMINI_API_KEY = 'YOUR_ACTUAL_API_KEY_HERE';
+function getStaticGeminiApiKey(): string {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY?.trim();
+  if (!apiKey) {
+    throw new Error('VITE_GEMINI_API_KEY_MISSING');
+  }
+  return apiKey;
+}
 
 function stripJsonFences(raw: string): string {
   const trimmed = raw.trim();
@@ -136,7 +142,8 @@ function stripJsonFences(raw: string): string {
 export async function analyzeComponentStaticFallback(
   image: UploadedImage
 ): Promise<ComponentAnalysis> {
-  const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+  const apiKey = getStaticGeminiApiKey();
+  const ai = new GoogleGenAI({ apiKey });
 
   const promptText = [
     'You are an expert electrical engineer and hardware diagnostics specialist.',

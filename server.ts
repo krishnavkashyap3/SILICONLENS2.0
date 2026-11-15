@@ -11,10 +11,43 @@ const __dirname = path.dirname(__filename);
 const PORT = Number(process.env.PORT) || 3000;
 
 const app = express();
-app.use(express.json({ limit: '15mb' }));
+
+// Allow base64 payloads representing up to 15 MB binary images (~20 MB base64 JSON)
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ limit: '25mb', extended: true }));
+
+// Production-ready CORS middleware supporting split frontend/backend deployments
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const allowedOriginsEnv = process.env.ALLOWED_ORIGIN?.trim();
+  const requestOrigin = req.headers.origin;
+
+  if (!allowedOriginsEnv || allowedOriginsEnv === '*') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  } else if (requestOrigin) {
+    const allowedList = allowedOriginsEnv.split(',').map((o) => o.trim());
+    if (allowedList.includes(requestOrigin)) {
+      res.setHeader('Access-Control-Allow-Origin', requestOrigin);
+      res.setHeader('Vary', 'Origin');
+    }
+  }
+
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Max-Age', '86400');
+
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+
+  next();
+});
 
 function getGeminiClient(): GoogleGenAI {
-  const apiKey = process.env.GEMINI_API_KEY || 'YOUR_ACTUAL_API_KEY_HERE';
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY_MISSING');
+  }
   return new GoogleGenAI({
     apiKey,
     httpOptions: {
@@ -197,6 +230,14 @@ app.post('/api/analyze-component', async (req: Request, res: Response) => {
       return;
     }
 
+    const estimatedImageBytes = Math.ceil((imageBase64.length * 3) / 4);
+    if (estimatedImageBytes > 15 * 1024 * 1024) {
+      res.status(413).json({
+        error: 'The uploaded image exceeds the 15 MB limit. Please upload a smaller photo.',
+      });
+      return;
+    }
+
     const validMime =
       typeof mimeType === 'string' && mimeType.startsWith('image/')
         ? mimeType
@@ -252,6 +293,14 @@ app.post('/api/analyze-component', async (req: Request, res: Response) => {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
 
+    if (message === 'GEMINI_API_KEY_MISSING') {
+      res.status(500).json({
+        error:
+          'Gemini API key is not configured on the server. Set the GEMINI_API_KEY environment variable.',
+      });
+      return;
+    }
+
     if (
       message.includes('API_KEY_INVALID') ||
       message.includes('API key not valid') ||
@@ -260,7 +309,7 @@ app.post('/api/analyze-component', async (req: Request, res: Response) => {
     ) {
       res.status(403).json({
         error:
-          'The Gemini API key appears invalid or lacks permission. Please verify GEMINI_API_KEY in Settings > Secrets.',
+          'The Gemini API key appears invalid or lacks permission. Please verify GEMINI_API_KEY.',
       });
       return;
     }
